@@ -2,7 +2,7 @@
 
 ## 1. Repository and application foundation
 
-- [ ] 1.1 Create the private GitHub repository under `Ander01` and establish `main` and `develop`; verify the repository is private and both branches exist.
+- [x] 1.1 Create the private GitHub repository under `Ander01` and establish `main` and `develop`; verify the repository is private and both branches exist.
 - [x] 1.2 Create `feature/feature01-greenfield` from `develop`; verify the feature branch points to the develop baseline.
 - [x] 1.3 Scaffold the React, Vite, and TypeScript application with development and production scripts; verify dependency installation and the development build complete successfully.
 - [x] 1.4 Establish the feature-oriented source structure, shared styling primitives, and accessible application layout; verify the app starts and the introductory view renders.

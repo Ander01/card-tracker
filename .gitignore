@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Graphify
+# The knowledge graph artifacts (graph.json, GRAPH_REPORT.md, graph.html) are
+# versioned so agents and contributors share one map of the codebase.
+# Everything below is machine-local cache or regeneration scratch.
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/cost.json
+graphify-out/.graphify_chunk_*.json
+graphify-out/.graphify_labels.json
+graphify-out/.graphify_python
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

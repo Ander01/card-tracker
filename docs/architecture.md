@@ -35,6 +35,28 @@ The application has one top-level React composition point:
 4. [`src/domain/collection.ts`](../src/domain/collection.ts) defines card types, validation, filtering, and the local storage boundary.
 5. [`src/domain/suggestions.ts`](../src/domain/suggestions.ts) consumes cards and produces deterministic theme-based binder suggestions.
 
+The scanner adds a temporary camera branch from the collection view:
+
+```text
+collection view
+    |
+    v
+scanner/ScannerView.tsx
+    |
+    +--> scanner/camera.ts
+    |       +--> browser getUserMedia()
+    |       +--> live preview and track cleanup
+    |       +--> canvas still capture
+    |
+    +--> ephemeral captured image
+    +--> manual NewCard review
+    |
+    v
+collection.ts validation and localStorage
+```
+
+Camera images exist only during the active scanner workflow and are never written to the `card-tracker.collection` localStorage record. Recognition and grading-centering analysis are represented as future unavailable/available result boundaries; this feature does not run a model or generate placeholder scores.
+
 The collection is local to the browser. `createLocalStorage()` uses the `card-tracker.collection` key; there is no account, API, or remote synchronization layer in the current runtime.
 
 ## Feature ownership
@@ -45,6 +67,7 @@ The collection is local to the browser. `createLocalStorage()` uses the `card-tr
 | Collection model, validation, search, filters | [`src/domain/collection.ts`](../src/domain/collection.ts), collection view in [`src/App.tsx`](../src/App.tsx) | [`openspec/specs/collection-management/spec.md`](../openspec/specs/collection-management/spec.md) | [`src/domain/collection.test.ts`](../src/domain/collection.test.ts), [`src/App.test.tsx`](../src/App.test.tsx) |
 | Local persistence | [`createLocalStorage()`](../src/domain/collection.ts) | [`openspec/specs/collection-management/spec.md`](../openspec/specs/collection-management/spec.md) | [`src/domain/storage.test.ts`](../src/domain/storage.test.ts) |
 | Binder themes and deterministic ordering | [`src/domain/suggestions.ts`](../src/domain/suggestions.ts), suggestions view in [`src/App.tsx`](../src/App.tsx) | [`openspec/specs/binder-order-suggestions/spec.md`](../openspec/specs/binder-order-suggestions/spec.md) | [`src/domain/suggestions.test.ts`](../src/domain/suggestions.test.ts), [`src/App.test.tsx`](../src/App.test.tsx) |
+| Camera capture and reviewed card entry | [`src/scanner/ScannerView.tsx`](../src/scanner/ScannerView.tsx), [`src/scanner/camera.ts`](../src/scanner/camera.ts), scanner entry in [`src/App.tsx`](../src/App.tsx) | Change capability [`camera-card-scanning`](../openspec/changes/camera-card-scanner/specs/camera-card-scanning/spec.md) | [`src/scanner/ScannerView.test.tsx`](../src/scanner/ScannerView.test.tsx), [`src/scanner/camera.test.ts`](../src/scanner/camera.test.ts) |
 | Accessibility baseline | [`src/accessibility.test.tsx`](../src/accessibility.test.tsx) | App shell and collection scenarios | `vitest-axe` check in accessibility test |
 
 ## Test-to-behavior map

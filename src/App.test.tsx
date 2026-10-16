@@ -1,6 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+
+vi.mock('./scanner/camera', () => ({
+  requestCamera: vi.fn().mockRejectedValue({ code: 'unavailable', message: 'No usable camera was found on this device.' }),
+  captureFrame: vi.fn(),
+  getCameraError: vi.fn(),
+  stopCamera: vi.fn(),
+}))
 
 describe('Card Tracker app shell', () => {
   beforeEach(() => localStorage.clear())
@@ -34,5 +41,15 @@ describe('Card Tracker app shell', () => {
     fireEvent.click(screen.getByRole('button', { name: /Generate layout/i }))
     expect(screen.getByRole('heading', { name: 'Fire' })).toBeTruthy()
     expect(screen.getByText('Charizard')).toBeTruthy()
+  })
+
+  it('opens and exits the card scanner from the collection', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /Open my collection/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Scan a card/i }))
+    expect(screen.getByRole('heading', { name: /Capture a card/i })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: /Camera unavailable/i })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Use manual entry/i }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: /My collection/i })).toBeTruthy())
   })
 })

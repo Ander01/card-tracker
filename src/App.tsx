@@ -10,8 +10,9 @@ import {
   type NewCard,
 } from './domain/collection'
 import { suggestBinderOrder, type BinderSuggestion } from './domain/suggestions'
+import { ScannerView } from './scanner/ScannerView'
 
-type View = 'home' | 'collection' | 'suggestions'
+type View = 'home' | 'collection' | 'suggestions' | 'scanner'
 
 const initialCard: NewCard = { name: '', set: '', type: 'Pokemon', rarity: 'Common', quantity: 1, notes: '' }
 const storage = createLocalStorage()
@@ -87,7 +88,7 @@ export function App() {
 
       {view === 'collection' && (
         <main className="page">
-          <div className="page-heading"><div><p className="eyebrow">THE ARCHIVE</p><h1>My collection</h1><p>Every card has a place. Start building yours.</p></div><button className="primary-button" onClick={() => document.getElementById('add-card')?.focus()}>+ Add a card</button></div>
+          <div className="page-heading"><div><p className="eyebrow">THE ARCHIVE</p><h1>My collection</h1><p>Every card has a place. Start building yours.</p></div><div className="collection-actions"><button className="secondary-button" onClick={() => setView('scanner')}>Scan a card</button><button className="primary-button" onClick={() => document.getElementById('add-card')?.focus()}>+ Add a card</button></div></div>
           {savedMessage && <div className="success-message" role="status">{savedMessage}</div>}
           <div className="collection-layout">
             <section className="panel collection-panel">
@@ -99,6 +100,15 @@ export function App() {
           </div>
         </main>
       )}
+
+      {view === 'scanner' && <ScannerView onCancel={() => setView('collection')} onSave={(nextCard) => {
+        const next: Card = { ...nextCard, name: nextCard.name.trim(), id: crypto.randomUUID() }
+        const nextCards = [...cards, next]
+        setCards(nextCards)
+        storage.save(nextCards)
+        setSavedMessage(`${next.name} was added to your collection.`)
+        setView('collection')
+      }} />}
 
       {view === 'suggestions' && (
         <main className="page suggestion-page"><div className="page-heading"><div><p className="eyebrow">THE CURATION DESK</p><h1>Binder ideas</h1><p>Give your collection a direction and we will find the through-line.</p></div><span className="collection-count">{cards.length} cards available</span></div><section className="suggestion-builder panel"><label htmlFor="theme">What story are you telling?</label><div className="suggestion-input"><input id="theme" value={theme} onChange={(event) => setTheme(event.target.value)} placeholder="Try fire, water, evolution, or favorites" onKeyDown={(event) => event.key === 'Enter' && generateSuggestion()} /><button className="primary-button" onClick={generateSuggestion}>Generate layout -&gt;</button></div><div className="theme-chips">{['Fire', 'Water', 'Evolution', 'Favorites'].map((item) => <button key={item} onClick={() => setTheme(item)}>{item}</button>)}</div>{!theme.trim() && <p className="helper-text">Choose a theme to see how your cards could come together.</p>}{theme.trim() && !suggestion && <p className="form-error" role="alert">Enter a theme before generating a layout.</p>}</section>{suggestion && <section className="suggestion-result"><div className="result-heading"><div><p className="eyebrow">YOUR LAYOUT</p><h2>{suggestion.theme}</h2><p>{suggestion.rationale}</p></div><span className="result-count">{suggestion.cards.length} placed</span></div>{suggestion.cards.length ? <div className="binder-grid">{suggestion.cards.map((item, index) => <article className="binder-slot" key={item.id}><span>{String(index + 1).padStart(2, '0')}</span><strong>{item.name}</strong><small>{item.set || 'Set not specified'}</small></article>)}</div> : <div className="empty-state result-empty"><h3>No cards found for this theme</h3><p>Add cards with notes or names related to this theme, then try again.</p></div>}{suggestion.unclassified.length > 0 && <p className="unclassified"><strong>{suggestion.unclassified.length} card(s)</strong> could not be classified because theme-related information is unavailable.</p>}</section>}</main>

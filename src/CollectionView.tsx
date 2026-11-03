@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react'
+import { CardArtwork } from './CardArtwork'
 import {
   binderCapacity, cardTypes, deleteContainer, elementalTypes, emptyCopyFilters, filterCopies,
-  euroInput, formatEuro, generations, hasUnsorted, moveCopies, rarities, requireValid, saveBinder, saveCategory, setCopyValue,
+  euroInput, formatEuro, generations, hasUnsorted, moveCopies, requireValid, saveBinder, saveCategory, setCopyValue,
   type Binder, type CollectionState, type CopyFilters, type Location, type OwnedCopy, type Scope,
 } from './domain/collection'
 
@@ -42,8 +43,9 @@ export function CollectionView({ state, commit }: { state: CollectionState; comm
     return <article className="owned-copy" key={copy.id}>
       <label className="check-label"><input type="checkbox" checked={selected.includes(copy.id)} onChange={() => toggle(copy.id)} /><span>Select {entry.name} copy {ordinal}</span></label>
       <h3>{entry.name}</h3>
+      {entry.catalog && <><CardArtwork baseUrl={entry.catalog.snapshot.imageBaseUrl} name={`${entry.name}, ${entry.set} ${entry.catalog.collectorNumber}`} /><p className="copy-metadata">{entry.catalog.cardId} / {entry.catalog.collectorNumber} (English)</p></>}
       <details className="copy-details" open={!binder}><summary>Copy details and value</summary>
-      <p className="copy-metadata">{entry.set || 'Set unknown'} · {entry.type} · {entry.rarity}</p>
+      <p className="copy-metadata">{entry.set || 'Set unknown'} · {entry.type} · {entry.rarity ?? 'Rarity unknown'}</p>
       <p className="copy-metadata">Typing: {entry.elementalTypes?.join(', ') || 'Unknown'} · Generation: {entry.generations?.join(', ') || 'Unknown'}</p>
       {entry.notes && <p className="copy-metadata">{entry.notes}</p>}
       {copy.location.kind === 'binder' ? <button className="location-link" onClick={() => {
@@ -116,7 +118,7 @@ function CopyFilterForm({ filters, state, onApply }: { filters: CopyFilters; sta
   const [draft, setDraft] = useState(filters)
   const update = (key: keyof CopyFilters, value: string) => setDraft((current) => ({ ...current, [key]: value }))
   const selects: { key: keyof CopyFilters; label: string; options: readonly string[] }[] = [
-    { key: 'type', label: 'Card kind', options: cardTypes }, { key: 'rarity', label: 'Rarity', options: rarities },
+    { key: 'type', label: 'Card kind', options: cardTypes }, { key: 'rarity', label: 'Rarity', options: [...new Set(state.entries.flatMap((entry) => entry.rarity ? [entry.rarity] : []))].sort() },
     { key: 'elementalType', label: 'Elemental typing', options: elementalTypes }, { key: 'generation', label: 'Generation', options: generations },
   ]
   return <form className="copy-filters" noValidate onSubmit={(event) => { event.preventDefault(); onApply(draft) }}>

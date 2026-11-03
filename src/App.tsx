@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { addCopies, CollectionError, createLocalStorage, projectCards, type CollectionState, type NewCard } from './domain/collection'
 import { StorageError } from './domain/storage'
 import { suggestBinderOrder, type BinderSuggestion } from './domain/suggestions'
 import { ScannerView } from './scanner/ScannerView'
 import { CardFields, initialCard } from './CardFields'
 import { CollectionView, type Commit } from './CollectionView'
+import { CatalogIntake } from './catalog/CatalogIntake'
 
 type View = 'home' | 'collection' | 'suggestions' | 'scanner'
 type Loaded = { state: CollectionState; error?: never } | { error: string; state?: never }
@@ -20,6 +21,10 @@ export function App() {
   const [view, setView] = useState<View>('home')
   const [loaded, setLoaded] = useState<Loaded>(loadCollection)
   const [card, setCard] = useState<NewCard>(initialCard)
+  const [intakeMode, setIntakeMode] = useState<'manual' | 'catalog'>('manual')
+  useEffect(() => {
+    if (intakeMode === 'manual') document.getElementById('add-card-name')?.focus()
+  }, [intakeMode])
   const [error, setError] = useState('')
   const [savedMessage, setSavedMessage] = useState('')
   const [theme, setTheme] = useState('')
@@ -52,12 +57,14 @@ export function App() {
         <section className="feature-strip"><div><strong>01</strong><span>Track every favorite</span></div><div><strong>02</strong><span>Find what fits together</span></div><div><strong>03</strong><span>Arrange it your way</span></div></section>
       </main>}
       {view === 'collection' && <main className="page collection-page">
-        <div className="page-heading"><div><h1>My collection</h1><p>Every copy has a place. Keep bulk behind dividers and favorites in binders.</p></div><div className="collection-actions"><button className="secondary-button" onClick={() => setView('scanner')}>Scan a card</button><button className="primary-button" onClick={() => document.getElementById('add-card-name')?.focus()}>+ Add a card</button></div></div>
+        <div className="page-heading"><div><h1>My collection</h1><p>Every copy has a place. Keep bulk behind dividers and favorites in binders.</p></div><div className="collection-actions"><button className="secondary-button" onClick={() => setView('scanner')}>Scan a card</button><button className="primary-button" onClick={() => document.getElementById('add-card-heading')?.focus()}>+ Add a card</button></div></div>
         <CollectionView state={loaded.state} commit={commit} />
-        <section className="panel add-panel collection-intake" aria-label="Add a card"><h2>Add a card</h2><p>New copies always arrive in Bulk / Unsorted. Sort them whenever you're ready.</p><form noValidate onSubmit={(event) => {
+        <section className="panel add-panel collection-intake" aria-label="Add a card"><h2 id="add-card-heading" tabIndex={-1}>Add a card</h2><p>New copies always arrive in Bulk / Unsorted. Sort them whenever you're ready.</p>
+        <div className="intake-modes" aria-label="Card entry method"><button type="button" className="secondary-button" aria-pressed={intakeMode === 'manual'} onClick={() => setIntakeMode('manual')}>Manual entry</button><button type="button" className="secondary-button" aria-pressed={intakeMode === 'catalog'} onClick={() => setIntakeMode('catalog')}>Search card catalog</button></div>
+        {intakeMode === 'catalog' ? <CatalogIntake onSave={intake} onManual={(draft) => { if (draft) setCard(draft); setIntakeMode('manual') }} /> : <form noValidate onSubmit={(event) => {
           event.preventDefault()
           if (intake(card)) setCard(initialCard)
-        }}><CardFields card={card} onChange={(change) => setCard((current) => ({ ...current, ...change }))} prefix="add-card" /><button className="primary-button" type="submit">Save card <span aria-hidden="true">-&gt;</span></button></form></section>
+        }}><CardFields card={card} onChange={(change) => setCard((current) => ({ ...current, ...change }))} prefix="add-card" /><button className="primary-button" type="submit">Save card <span aria-hidden="true">-&gt;</span></button></form>}</section>
       </main>}
       {view === 'scanner' && <ScannerView onCancel={() => setView('collection')} onSave={(draft) => { if (intake(draft)) setView('collection') }} />}
       {view === 'suggestions' && <main className="page suggestion-page">

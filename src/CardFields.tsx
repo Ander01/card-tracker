@@ -11,10 +11,7 @@ export function CardFields({ card, onChange, prefix }: { card: NewCard; onChange
         const type = cardTypes.find((type) => type === event.target.value)
         if (type) onChange({ type })
       }}>{cardTypes.map((type) => <option key={type}>{type}</option>)}</select></label>
-      <label>Rarity<select value={card.rarity} onChange={(event) => {
-        const rarity = rarities.find((rarity) => rarity === event.target.value)
-        if (rarity) onChange({ rarity })
-      }}>{rarities.map((rarity) => <option key={rarity}>{rarity}</option>)}</select></label>
+      <label>Rarity<input list={`${prefix}-rarities`} value={card.rarity ?? ''} placeholder="Unknown" onChange={(event) => onChange({ rarity: event.target.value || undefined })} /><datalist id={`${prefix}-rarities`}>{rarities.map((rarity) => <option key={rarity} value={rarity} />)}</datalist></label>
     </div>
     <details><summary>Elemental typing and Pokemon generation (optional)</summary>
       <fieldset><legend>Elemental typing</legend>{elementalTypes.map((type) => <label className="check-label" key={type}><input type="checkbox" checked={card.elementalTypes?.includes(type) ?? false} onChange={(event) => onChange({ elementalTypes: event.target.checked ? [...(card.elementalTypes ?? []), type] : card.elementalTypes?.filter((value) => value !== type) })} />{type}</label>)}</fieldset>

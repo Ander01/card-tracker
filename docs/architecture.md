@@ -4,7 +4,7 @@ This document is a navigation guide for contributors and coding agents. The gene
 
 ## Runtime entrypoint and data flow
 
-### Physical collection state (v2)
+### Physical collection state (v3)
 
 `src/domain/collection.ts` owns shared card entries and individually identified
 physical copies. An entry retains descriptive metadata (`type` is the card kind,
@@ -20,7 +20,7 @@ inclusive value bounds within All cards, whole bulk, or a selected section; they
 never reorganize physical locations. Binder grid changes require an empty binder;
 removing trailing pages requires those pages to be empty.
 
-`src/domain/storage.ts` validates the complete v2 envelope at
+`src/domain/storage.ts` validates the complete v3 envelope at
 `card-tracker.collection`. A valid legacy quantity array is expanded once into
 stable copies in Unsorted, with unknown values, retaining metadata and entry ids.
 The exact legacy payload is retained first at
@@ -29,9 +29,22 @@ the source untouched. Malformed or unsupported data produces a blocking recovery
 error, not an empty editable collection. Saves validate and persist one snapshot
 before the application publishes state or announces success.
 
-Do not roll back to an old array-only bundle against v2 data. Preserve current v2
+Existing valid v2 snapshots are backed up verbatim at
+`card-tracker.collection.v2-backup` before upgrading to v3. Conflicting backups
+or failed writes block loading without overwriting the source.
+
+Catalog metadata belongs to the entry, never to its physical copies.
+`src/domain/catalog.ts` defines the validated TCGdex reference and selected
+metadata snapshot. Rarity is an optional provider label, distinct from available
+printing variants and from Unknown. Collector numbers remain strings.
+Main Pokedex IDs map explicitly to generations I-IX using inclusive ranges:
+1-151, 152-251, 252-386, 387-493, 494-649, 650-721, 722-809, 810-905,
+and 906-1025. Missing and unsupported IDs do not acquire a guessed generation.
+Multiple supported main species contribute deduplicated generations.
+
+Do not roll back to an old bundle against v3 data. Preserve current v3
 data before manually restoring a legacy backup: that restoration would lose later
-organization and valuation edits. Prefer a fixed v2-compatible reader; restoration
+organization and valuation edits. Prefer a fixed v3-compatible reader; restoration
 and data reset are never automatic.
 
 ```text
@@ -88,7 +101,15 @@ shared addCopies() validation -> storage.ts -> localStorage
 
 Camera images exist only during the active scanner workflow and are never written to the `card-tracker.collection` localStorage record. Recognition and grading-centering analysis are represented as future unavailable/available result boundaries; this feature does not run a model or generate placeholder scores.
 
-The collection is local to the browser. `createLocalStorage()` uses the `card-tracker.collection` key; there is no account, API, or remote synchronization layer in the current runtime.
+The collection is local to the browser. `createLocalStorage()` uses the
+`card-tracker.collection` key; there is no account or remote synchronization.
+`src/catalog/client.ts` reads the hosted English TCGdex v2 API through a validated
+fetch boundary. It caches set/series membership and selected details for the
+session, excludes series `tcgp`, and uses constant-size provider pagination.
+Search sends only catalog queries/IDs, not local ownership data or captures.
+Owned collection loading never calls the catalog. The selected snapshot is local;
+artwork references load separately from `assets.tcgdex.net` and are not an
+offline-image guarantee. Provider prices are intentionally omitted.
 
 ## Feature ownership
 

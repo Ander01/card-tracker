@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  cardTypes,
-  rarities,
-  validateCard,
-  type NewCard,
-} from '../domain/collection'
+import { validateCard, type NewCard } from '../domain/collection'
+import { CardFields, initialCard } from '../CardFields'
 import { captureFrame, getCameraError, requestCamera, stopCamera } from './camera'
 import type { CameraError, CapturedImage, ScannerPhase } from './types'
-
-const initialCard: NewCard = { name: '', set: '', type: 'Pokemon', rarity: 'Common', quantity: 1, notes: '' }
 
 interface ScannerViewProps {
   onCancel: () => void
@@ -125,7 +119,7 @@ export function ScannerView({ onCancel, onSave }: ScannerViewProps) {
   }
 
   if (phase === 'review' && captured) {
-    return <main className="page scanner-page"><ScannerHeader onCancel={handleCancel} /><section className="panel scan-form-panel"><div className="review-heading"><div><p className="eyebrow">REVIEW DETAILS</p><h2>Add this card to your collection</h2></div><img className="review-thumbnail" src={captured.dataUrl} alt="Captured card preview" /></div><div className="analysis-status" aria-live="polite"><strong>Analysis not available yet</strong><span>Card identification and grading centering will be added in a future model feature.</span></div><form onSubmit={handleSubmit}><label htmlFor="scan-card-name">Card name<input id="scan-card-name" value={card.name} onChange={(event) => updateCard({ name: event.target.value })} placeholder="e.g. Umbreon" /></label><label>Set<input value={card.set} onChange={(event) => updateCard({ set: event.target.value })} placeholder="e.g. Neo Discovery" /></label><div className="form-grid"><label>Type<select value={card.type} onChange={(event) => updateCard({ type: event.target.value as NewCard['type'] })}>{cardTypes.map((type) => <option key={type}>{type}</option>)}</select></label><label>Rarity<select value={card.rarity} onChange={(event) => updateCard({ rarity: event.target.value as NewCard['rarity'] })}>{rarities.map((rarity) => <option key={rarity}>{rarity}</option>)}</select></label></div><label>Quantity<input type="number" min="1" value={card.quantity} onChange={(event) => updateCard({ quantity: Number(event.target.value) })} /></label><label>Notes <span className="optional">Optional</span><textarea value={card.notes} onChange={(event) => updateCard({ notes: event.target.value })} placeholder="Why this card matters..." rows={3} /></label>{formError && <p className="form-error" role="alert">{formError}</p>}<div className="scanner-actions"><button className="primary-button" type="submit">Save card <span aria-hidden="true">-&gt;</span></button><button className="text-button" type="button" onClick={handleCancel}>Discard capture</button></div></form></section></main>
+    return <main className="page scanner-page"><ScannerHeader onCancel={handleCancel} /><section className="panel scan-form-panel"><div className="review-heading"><div><h2>Add this card to your collection</h2></div><img className="review-thumbnail" src={captured.dataUrl} alt="Captured card preview" /></div><div className="analysis-status" aria-live="polite"><strong>Analysis not available yet</strong><span>Card identification and grading centering will be added in a future model feature.</span></div><form noValidate onSubmit={handleSubmit}><CardFields card={card} onChange={updateCard} prefix="scan-card" />{formError && <p className="form-error" role="alert">{formError}</p>}<div className="scanner-actions"><button className="primary-button" type="submit">Save card <span aria-hidden="true">-&gt;</span></button><button className="text-button" type="button" onClick={handleCancel}>Discard capture</button></div></form></section></main>
   }
 
   return <main className="page scanner-page"><ScannerHeader onCancel={onCancel} /><section className="panel camera-panel"><div className="camera-frame"><video ref={videoRef} autoPlay muted playsInline aria-label="Live camera preview" /><div className="card-guide" aria-hidden="true" /></div><p className="camera-instructions">Place one card inside the frame. Keep the card flat, fully visible, and free from glare.</p><button className="primary-button full-width" onClick={handleCapture}>Capture card</button></section></main>

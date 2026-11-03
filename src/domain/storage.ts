@@ -3,9 +3,11 @@ import {
   validateBinder, validateLocation, pocketKey, CollectionError,
   type CardEntry, type CollectionState, type Location,
 } from './collection'
+import { parseCatalogReference } from './catalog'
 
 export const storageKey = 'card-tracker.collection'
 export const legacyBackupKey = 'card-tracker.collection.legacy-backup'
+export const v2BackupKey = 'card-tracker.collection.v2-backup'
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -36,14 +38,15 @@ function choices<T extends string>(value: unknown, supported: readonly T[]): T {
   requireValid(found !== undefined, 'Unsupported stored metadata.')
   return found
 }
-function entry(value: unknown): CardEntry {
+function entry(value: unknown, legacy = false): CardEntry {
   const data = object(value)
   requireValid(!('image' in data) && !('dataUrl' in data), 'Unexpected image data in collection.')
   return {
     id: id(data.id), name: id(data.name), set: string(data.set), type: choices(data.type, cardTypes),
-    rarity: choices(data.rarity, rarities), notes: string(data.notes),
+    rarity: legacy ? choices(data.rarity, rarities) : data.rarity === undefined ? undefined : id(data.rarity), notes: string(data.notes),
     elementalTypes: data.elementalTypes === undefined ? [] : array(data.elementalTypes).map((value) => choices(value, elementalTypes)),
     generations: data.generations === undefined ? [] : array(data.generations).map((value) => choices(value, generations)),
+    ...(!legacy && data.catalog !== undefined ? { catalog: parseCatalogReference(data.catalog) } : {}),
   }
 }
 function location(value: unknown): Location {
@@ -62,12 +65,12 @@ function location(value: unknown): Location {
 function unique(values: string[]) {
   requireValid(new Set(values).size === values.length, 'Duplicate stored identifiers or category names.')
 }
-export function parseState(value: unknown): CollectionState {
+export function parseState(value: unknown, legacy = false): CollectionState {
   const data = object(value)
-  requireValid(data.version === 2 && data.currency === 'EUR', 'Unsupported collection version or currency.')
+  requireValid(data.version === (legacy ? 2 : 3) && data.currency === 'EUR', 'Unsupported collection version or currency.')
   const state: CollectionState = {
-    version: 2, currency: 'EUR',
-    entries: array(data.entries).map(entry),
+    version: 3, currency: 'EUR',
+    entries: array(data.entries).map((value) => entry(value, legacy)),
     categories: array(data.categories).map((value) => {
       const item = object(value)
       const name = id(item.name).trim()
@@ -111,17 +114,24 @@ export function createLocalStorage(provided?: Storage) {
         const raw = storage.getItem(storageKey)
         if (raw === null) return emptyCollection()
         const parsed: unknown = JSON.parse(raw)
-        if (!Array.isArray(parsed)) return parseState(parsed)
-        let migrated = emptyCollection()
-        for (const value of parsed) {
-          const item = object(value)
-          const metadata = entry(item)
-          migrated = addCopies(migrated, { ...metadata, quantity: number(item.quantity) }, metadata.id)
+        const legacyArray = Array.isArray(parsed)
+        if (!legacyArray && object(parsed).version !== 2) return parseState(parsed)
+        let migrated: CollectionState
+        if (legacyArray) {
+          migrated = emptyCollection()
+          for (const value of parsed) {
+            const item = object(value)
+            const metadata = entry(item, true)
+            migrated = addCopies(migrated, { ...metadata, quantity: number(item.quantity) }, metadata.id)
+          }
+        } else {
+          migrated = parseState(parsed, true)
         }
         parseState(migrated)
-        const backup = storage.getItem(legacyBackupKey)
-        requireValid(backup === null || backup === raw, 'An existing legacy backup differs from this collection. Preserve both payloads before retrying migration.')
-        if (backup === null) storage.setItem(legacyBackupKey, raw)
+        const backupKey = legacyArray ? legacyBackupKey : v2BackupKey
+        const backup = storage.getItem(backupKey)
+        requireValid(backup === null || backup === raw, `An existing ${legacyArray ? 'legacy' : 'v2'} backup differs from this collection. Preserve both payloads before retrying migration.`)
+        if (backup === null) storage.setItem(backupKey, raw)
         storage.setItem(storageKey, JSON.stringify(migrated))
         return migrated
       } catch (error) {
@@ -130,8 +140,8 @@ export function createLocalStorage(provided?: Storage) {
     },
     save(state: CollectionState): void {
       try {
-        parseState(state)
-        access().setItem(storageKey, JSON.stringify(state))
+        const validated = parseState(state)
+        access().setItem(storageKey, JSON.stringify(validated))
       } catch (error) {
         if (error instanceof CollectionError) throw error
         throw new StorageError(`Could not save collection. Previous saved data is unchanged. ${error instanceof Error ? error.message : 'Storage access failed.'}`)

@@ -1,21 +1,24 @@
+import { CatalogDataError, parseCatalogReference, type CatalogReference } from './catalog'
+
 export const cardTypes = ['Pokemon', 'Trainer', 'Energy'] as const
 export const rarities = ['Common', 'Uncommon', 'Rare', 'Holo Rare', 'Ultra Rare'] as const
 export const elementalTypes = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal', 'Dragon', 'Fairy', 'Colorless'] as const
 export const generations = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'] as const
 
 export type CardType = (typeof cardTypes)[number]
-export type Rarity = (typeof rarities)[number]
+export type Rarity = string
 
 export interface Card {
   id: string
   name: string
   set: string
   type: CardType
-  rarity: Rarity
+  rarity?: Rarity
   quantity: number
   notes: string
   elementalTypes?: string[]
   generations?: string[]
+  catalog?: CatalogReference
 }
 
 export type NewCard = Omit<Card, 'id'>
@@ -32,6 +35,13 @@ export const emptyFilters: CardFilters = { query: '', set: '', type: '', rarity:
 export function validateCard(card: NewCard): Partial<Record<keyof NewCard, string>> {
   const errors: Partial<Record<keyof NewCard, string>> = {}
   if (!card.name.trim()) errors.name = 'Card name is required.'
+  if (card.rarity !== undefined && !card.rarity.trim()) errors.rarity = 'Choose a rarity or leave it unknown.'
+  if (card.catalog) {
+    try { parseCatalogReference(card.catalog) } catch (error) {
+      if (!(error instanceof CatalogDataError)) throw error
+      errors.catalog = error.message
+    }
+  }
   if (!Number.isSafeInteger(card.quantity) || card.quantity < 1 || card.quantity > 4294967295) {
     errors.quantity = 'Quantity must be a whole number greater than zero.'
   }
@@ -62,7 +72,7 @@ export interface OwnedCopy { id: string; entryId: string; valueCents: number | n
 export interface Category { id: string; name: string }
 export interface Binder { id: string; name: string; color: string; pageCount: number; rows: number; columns: number }
 export interface CollectionState {
-  version: 2
+  version: 3
   currency: 'EUR'
   entries: CardEntry[]
   copies: OwnedCopy[]
@@ -73,7 +83,7 @@ export class CollectionError extends Error {}
 export function requireValid(condition: unknown, message: string): asserts condition {
   if (!condition) throw new CollectionError(message)
 }
-export const emptyCollection = (): CollectionState => ({ version: 2, currency: 'EUR', entries: [], copies: [], categories: [], binders: [] })
+export const emptyCollection = (): CollectionState => ({ version: 3, currency: 'EUR', entries: [], copies: [], categories: [], binders: [] })
 export const hasUnsorted = (state: CollectionState) => state.copies.some((copy) => copy.location.kind === 'unsorted')
 export const binderCapacity = (binder: Binder) => binder.pageCount * binder.rows * binder.columns
 

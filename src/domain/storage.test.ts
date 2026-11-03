@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { addCopies, emptyCollection, emptyCopyFilters, filterCopies, hasUnsorted, moveCopies, saveBinder, saveCategory, setCopyValue } from './collection'
-import { createLocalStorage, legacyBackupKey, storageKey } from './storage'
+import { createLocalStorage, legacyBackupKey, parseState, storageKey, v2BackupKey } from './storage'
 
 const card = { id: '1', name: 'Pikachu', set: 'Base', type: 'Pokemon' as const, rarity: 'Common' as const, quantity: 4, notes: 'favorite' }
 
@@ -61,7 +61,7 @@ describe('versioned local collection storage', () => {
   it('preserves source on corrupted, unsupported or inconsistent data', () => {
     const valid = addCopies(emptyCollection(), card)
     const cases: unknown[] = [
-      '{broken', { ...valid, version: 3 },
+      '{broken', { ...valid, version: 4 },
       { ...valid, entries: [...valid.entries, valid.entries[0]] },
       { ...valid, copies: [{ ...valid.copies[0], entryId: 'missing' }] },
       { ...valid, copies: [{ ...valid.copies[0], valueCents: -1 }] },
@@ -104,6 +104,68 @@ describe('versioned local collection storage', () => {
     expect(createLocalStorage(storage).load()).toEqual(state)
     expect(filterCopies(state, emptyCopyFilters, { kind: 'bulk' })).toHaveLength(999)
     expect(state.copies).toHaveLength(1000)
+  })
+
+  it('backs up v2 exactly and preserves organized ownership and values', () => {
+    const storage = new StorageMock()
+    let state = saveCategory(saveBinder(addCopies(emptyCollection(), card, 'local-entry'), { id: 'b', name: 'Keep', color: '#112233', rows: 3, columns: 3, pageCount: 2 }), 'Trades', 'c')
+    state = setCopyValue(state, state.copies[0].id, '12.34')
+    state = moveCopies(state, [
+      { copyId: state.copies[0].id, location: { kind: 'binder', binderId: 'b', page: 1, pocket: 4 } },
+      { copyId: state.copies[1].id, location: { kind: 'category', categoryId: 'c' } },
+    ])
+    const raw = JSON.stringify({ ...state, version: 2 }, null, 2)
+    storage.setItem(storageKey, raw)
+    expect(createLocalStorage(storage).load()).toEqual(state)
+    expect(storage.getItem(v2BackupKey)).toBe(raw)
+    expect(createLocalStorage(storage).load()).toEqual(state)
+  })
+
+  it('preserves v2 source when backup conflicts or either write fails', () => {
+    const storage = new StorageMock()
+    const raw = JSON.stringify({ ...addCopies(emptyCollection(), card), version: 2 })
+    storage.setItem(storageKey, raw)
+    storage.setItem(v2BackupKey, 'different')
+    expect(() => createLocalStorage(storage).load()).toThrow(/backup differs/)
+    storage.removeItem(v2BackupKey)
+    const write = storage.setItem.bind(storage)
+    const spy = vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new Error('Backup failed') })
+    expect(() => createLocalStorage(storage).load()).toThrow(/Backup failed/)
+    expect(storage.getItem(storageKey)).toBe(raw)
+    spy.mockImplementation((key, value) => { if (key === storageKey) throw new Error('Save failed'); write(key, value) })
+    expect(() => createLocalStorage(storage).load()).toThrow(/Save failed/)
+    expect(storage.getItem(storageKey)).toBe(raw)
+    expect(storage.getItem(v2BackupKey)).toBe(raw)
+  })
+
+  it('round trips complete catalog snapshots and unknown rarity without fetching', () => {
+    const storage = new StorageMock()
+    const state = addCopies(emptyCollection(), {
+      ...card, rarity: undefined,
+      catalog: {
+        provider: 'tcgdex', language: 'en', cardId: 'sv03.5-004', setId: 'sv03.5', collectorNumber: '004',
+        snapshot: {
+          imageBaseUrl: 'https://assets.tcgdex.net/en/sv/sv03.5/004', illustrator: 'Artist', dexIds: [4],
+          setLogoUrl: 'https://assets.tcgdex.net/en/sv/sv03.5/logo', setSymbolUrl: 'https://assets.tcgdex.net/univ/sv/sv03.5/symbol',
+          seriesId: 'sv', releaseDate: '2023-09-22',
+          variants: { flags: { normal: true, reverse: false }, detailed: [{ type: 'normal', subtype: 'unlimited', size: 'standard', stamps: ['promo'], variantId: 'v1' }] },
+        },
+      },
+    })
+    createLocalStorage(storage).save(state)
+    expect(createLocalStorage(storage).load()).toEqual(state)
+    const entry = state.entries[0]
+    for (const invalid of [
+      { ...entry, image: 'data:image/png;base64,abc' },
+      { ...entry, catalog: { ...entry.catalog, language: 'es' } },
+      { ...entry, catalog: { ...entry.catalog, collectorNumber: '4' } },
+      { ...entry, catalog: { ...entry.catalog, snapshot: { imageBaseUrl: 'data:image/png;base64,abc' } } },
+      { ...entry, catalog: { ...entry.catalog, snapshot: { imageBaseUrl: 'https://untrusted.example/image' } } },
+      { ...entry, catalog: { ...entry.catalog, snapshot: { dexIds: [-1] } } },
+    ]) {
+      expect(() => parseState({ ...state, entries: [invalid] })).toThrow()
+    }
+    expect(createLocalStorage(storage).load()).toEqual(state)
   })
 })
 

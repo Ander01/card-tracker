@@ -42,6 +42,36 @@ The collection is stored in the browser's local storage. No account, backend, or
 - Pokemon generation (not a card's release region or set year)
 - Independent manual EUR value for each physical copy, or Unknown
 
+## Real cards from TCGdex
+
+Use **Search card catalog** in the collection's Add a card section to find an
+English physical card by name or set. Select an exact result, check the set and
+collector number, enter quantity and personal notes, and save it into Unsorted.
+Catalog identity is read-only during review. **Use manual entry** detaches the
+catalog reference before you edit descriptive fields; manual entry and the
+reviewed-camera form remain available without a catalog connection.
+
+The catalog uses read-only requests to `https://api.tcgdex.net/v2/en`; artwork
+loads from `https://assets.tcgdex.net`. Only search parameters and requested
+catalog IDs are sent, never your collection, copy values, notes, or camera images.
+TCG Pocket digital cards are excluded using set/series membership.
+
+Exact collector numbers (including letters and leading zeros), provider rarity
+labels, and available printing variants are retained. Rarity is not finish:
+available holo/reverse/first-edition metadata does not claim that a particular
+variant is owned. Advanced per-copy variant tracking is not implemented.
+
+Selected metadata is saved locally, so an API outage does not block browsing
+owned cards. Missing artwork is shown explicitly; offline artwork is not
+guaranteed. Catalog failures offer retry and manual entry. Market prices are not
+imported into manual values. Automated recognition and centering remain
+unavailable; catalog lookup does not analyze camera captures.
+
+Data provided by [TCGdex](https://www.tcgdex.net), using its
+[open-source database](https://github.com/tcgdex/cards-database) and
+[API documentation](https://tcgdex.dev). The database is MIT-licensed; Pokemon
+artwork and trademarks remain the property of their respective owners.
+
 ## Organizing physical copies
 
 Every newly added copy, including reviewed scanner entries, starts in **Bulk /
@@ -81,6 +111,11 @@ It does not reserve pockets or move copies.
 Existing local quantity-based collections migrate automatically into Unsorted.
 The original payload is retained at `card-tracker.collection.legacy-backup`; new
 organization is saved as a validated versioned snapshot at the original key.
+Existing version 2 physical collections upgrade to version 3 after retaining the
+exact source at `card-tracker.collection.v2-backup`. IDs, locations, notes, values,
+and container configuration are preserved. Do not run an old app bundle against
+version 3 data; use a compatible reader and preserve current data before any
+manual backup restoration.
 Storage failures are displayed rather than silently resetting the collection.
 See the [architecture guide](docs/architecture.md) before attempting recovery.
 

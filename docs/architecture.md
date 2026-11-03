@@ -4,6 +4,36 @@ This document is a navigation guide for contributors and coding agents. The gene
 
 ## Runtime entrypoint and data flow
 
+### Physical collection state (v2)
+
+`src/domain/collection.ts` owns shared card entries and individually identified
+physical copies. An entry retains descriptive metadata (`type` is the card kind,
+with separate `elementalTypes` and `generations`). Copies own nullable integer
+EUR-cent values and exactly one discriminated location: Unsorted, a divider
+category, or a binder page/pocket. Counts and pocket occupancy are derived from
+copies, never maintained as competing quantity or occupancy arrays.
+
+The same domain module owns intake, category and binder validation, atomic moves,
+safe resizing, deletion-to-Unsorted, and copy-scoped filtering. Unsorted visibility
+depends on actual copies, never filtered results. Filters combine metadata and
+inclusive value bounds within All cards, whole bulk, or a selected section; they
+never reorganize physical locations. Binder grid changes require an empty binder;
+removing trailing pages requires those pages to be empty.
+
+`src/domain/storage.ts` validates the complete v2 envelope at
+`card-tracker.collection`. A valid legacy quantity array is expanded once into
+stable copies in Unsorted, with unknown values, retaining metadata and entry ids.
+The exact legacy payload is retained first at
+`card-tracker.collection.legacy-backup`. A failed backup or migration write leaves
+the source untouched. Malformed or unsupported data produces a blocking recovery
+error, not an empty editable collection. Saves validate and persist one snapshot
+before the application publishes state or announces success.
+
+Do not roll back to an old array-only bundle against v2 data. Preserve current v2
+data before manually restoring a legacy backup: that restoration would lose later
+organization and valuation edits. Prefer a fixed v2-compatible reader; restoration
+and data reset are never automatic.
+
 ```text
 index.html
     |
@@ -11,17 +41,17 @@ index.html
 src/main.tsx
     |
     v
-src/App.tsx
+src/App.tsx (validated state + save-before-publish commit)
     |
     +-----------------------------+
     |                             |
     v                             v
 collection.ts                 suggestions.ts
     |                             |
-    +--> Card model               +--> BinderSuggestion
+    +--> entries + owned copies   +--> BinderSuggestion (read-only)
     +--> validateCard()           +--> suggestBinderOrder()
     +--> filterCards()                    |
-    +--> createLocalStorage()             v
+    +--> storage.ts                       v
              |                    deterministic binder result
              v
       browser localStorage
@@ -31,9 +61,10 @@ The application has one top-level React composition point:
 
 1. [`index.html`](../index.html) provides the `#app` mount and loads `src/main.tsx`.
 2. [`src/main.tsx`](../src/main.tsx) creates the React root, loads global styles, and renders `App`.
-3. [`src/App.tsx`](../src/App.tsx) owns the `home`, `collection`, and `suggestions` views, shared card state, navigation, form submission, and feature composition.
-4. [`src/domain/collection.ts`](../src/domain/collection.ts) defines card types, validation, filtering, and the local storage boundary.
-5. [`src/domain/suggestions.ts`](../src/domain/suggestions.ts) consumes cards and produces deterministic theme-based binder suggestions.
+3. [`src/App.tsx`](../src/App.tsx) owns the `home`, `collection`, `scanner`, and `suggestions` views, validated collection state, save-before-publish commits, and shared intake.
+4. [`src/CollectionView.tsx`](../src/CollectionView.tsx) owns organization navigation, divider/binder management, scoped filtering, individual selection, atomic move forms, copy values, and active-page browsing. [`src/CardFields.tsx`](../src/CardFields.tsx) supplies the shared manual/scanner metadata fields.
+5. [`src/domain/collection.ts`](../src/domain/collection.ts) defines types and pure domain operations; [`src/domain/storage.ts`](../src/domain/storage.ts) validates, migrates, and persists the whole collection.
+6. [`src/domain/suggestions.ts`](../src/domain/suggestions.ts) consumes the derived entry/quantity projection and produces deterministic theme previews without placement side effects.
 
 The scanner adds a temporary camera branch from the collection view:
 
@@ -52,7 +83,7 @@ scanner/ScannerView.tsx
     +--> manual NewCard review
     |
     v
-collection.ts validation and localStorage
+shared addCopies() validation -> storage.ts -> localStorage
 ```
 
 Camera images exist only during the active scanner workflow and are never written to the `card-tracker.collection` localStorage record. Recognition and grading-centering analysis are represented as future unavailable/available result boundaries; this feature does not run a model or generate placeholder scores.
@@ -93,11 +124,18 @@ openspec/specs/<capability>/spec.md
 scenario -> runtime implementation -> focused test
 ```
 
-The current capability directories are:
+The durable capability directories are:
 
 - [`card-tracker-app-shell`](../openspec/specs/card-tracker-app-shell/spec.md)
 - [`collection-management`](../openspec/specs/collection-management/spec.md)
 - [`binder-order-suggestions`](../openspec/specs/binder-order-suggestions/spec.md)
+- [`camera-card-scanning`](../openspec/specs/camera-card-scanning/spec.md)
+
+- [`bulk-box-organization`](../openspec/specs/bulk-box-organization/spec.md)
+- [`binder-management`](../openspec/specs/binder-management/spec.md)
+
+The completed [collection organization change](../openspec/changes/archive/2026-11-03-organize-collection-binders-bulk/)
+contains the design, delta specs, implementation checklist, and acceptance evidence.
 
 Then trace the requirement to the matching rows in the feature and test tables above. Keep behavior in the domain module when it is domain logic; keep view composition in `App.tsx` unless the change explicitly includes a component-boundary refactor.
 
